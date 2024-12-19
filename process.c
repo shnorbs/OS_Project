@@ -34,13 +34,15 @@ int main(int argc, char *argv[]) {
     //quantum = (argc > 3) ? atoi(argv[3]) : 1;
     
     printf("Process %d started with remaining time: %d\n", current_pid, remainingtime);
-    
+    int current_time = getClk();
     while (remainingtime > 0) {
-        if (!paused) {
-            // Simulate work
-            sleep(1);
+        if (!paused) {            
             remainingtime--;
+
+
+            while (getClk() != current_time + 1); // removed sleep(1) and used a while loop instead
             printf("Process %d remaining time: %d\n", current_pid, remainingtime);
+            current_time++;
         }
     }
     
