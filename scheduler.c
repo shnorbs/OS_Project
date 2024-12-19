@@ -164,7 +164,7 @@ int main(int argc, char* argv[])
     signal(SIGCHLD, handleProcessCompletion);  // Handle child process termination
     initClk();
     int algo=atoi(argv[1]);
-    
+    int current_time;
     int process_count = atoi(argv[2]);
     int quanta = (argc > 3) ? atoi(argv[3]) : 0;
     if (quanta != 0)
@@ -188,7 +188,6 @@ int main(int argc, char* argv[])
         PCB pcb [process_count];
         int total_processes = 0; 
         readyQueue = createPriorityQueue(process_count);
-        int recievedProcessesCount = 0;
         struct msgbuff1
         {
             Process p;
@@ -199,6 +198,7 @@ int main(int argc, char* argv[])
         while (true) 
         {
             // Check for incoming processes
+            int i = 0;
             while (msgrcv(msgQid, &arrivingProcess, sizeof(arrivingProcess), 0, IPC_NOWAIT) != -1) 
             {
                 PCB newPCB = {
@@ -210,15 +210,9 @@ int main(int argc, char* argv[])
                     .waiting_time = 0,
                     .pid = -1  // Not yet forked
                 };
-                pcb [total_processes] = newPCB;
-                recievedProcessesCount++;
-                total_processes++;
-            }
-            while(recievedProcessesCount !=0)
-            {
-                
-                insertRuntimePriorityQueue(readyQueue, pcb[total_processes - recievedProcessesCount].process);
-                recievedProcessesCount--;
+                pcb [i] = newPCB;
+                insertRuntimePriorityQueue(readyQueue, pcb[i].process);
+                i++;
             }
 
             // If no process is running, select the next process
@@ -251,8 +245,8 @@ int main(int argc, char* argv[])
             }
 
             // Exit condition: no running process and no more processes in the queue
-            if(finished_counter==process_count)
-                break;
+            // if(finished_counter==process_count)
+            //     break;
             if(!currentPCB)
             {Waiting++;
                 printf("Waiting= %d \n",Waiting);
@@ -719,7 +713,11 @@ else if (algo == 4)
         logSchedulerPerformance(finished_counter); //Not working for some reason implementation below
     fclose(log_file);
     destroyPriorityQueue(readyQueue);
-    clearResources(0);
+    //clearResources(0);
+    while (true)
+    {
+        /* code */
+    }
     
     return 0;
 }
@@ -768,12 +766,13 @@ void logProcessfinished(FILE* log_file, PCB* pcb, const char* state, int time) {
 
 // Cleanup resources
 void clearResources(int signum) {
-    printf("Cleaning up resources...\n");
-     destroyClk(true);
+    printf("Cleaning up resources as Scheduler...\n");
+     //destroyClk(true);
      destroyPriorityQueue(readyQueue);
      free(WTA);
      free(Process_Wait);
-     raise(SIGKILL);
+     printf("Exiting\n");
+     exit(1);
     
 }
 void logSchedulerPerformance(int processCount) {

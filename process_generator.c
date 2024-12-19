@@ -10,6 +10,9 @@ void clearResources(int signum);
 int msgQid;
 Process* processes;
 char* File_name;
+int total_runtime = 0;
+int scheduler_pid;
+int clk_pid;
 
 int main(int argc, char* argv[]) {
 
@@ -72,11 +75,14 @@ int main(int argc, char* argv[]) {
                    &processes[i].id, 
                    &processes[i].arrival_time, 
                    &processes[i].runtime, 
-                   &processes[i].priority) == 4) {
+                   &processes[i].priority) == 4) 
+        {
             processes[i].prempted=false;
+            total_runtime += processes[i].runtime; // Add the runtime of each process into the total time
             i++;
         }
     }
+    total_runtime += processes[1].arrival_time; // Add the arrival time of the first process to total time
     free(line);
     fclose(file);
 
@@ -86,17 +92,17 @@ int main(int argc, char* argv[]) {
     if (argc > 3)
         sprintf(quantum_str, "%d", atoi(argv[3]));  // Set quantum only if provided
 
-    int clk_pid = fork();
+    clk_pid = fork();
     if (clk_pid == 0) {
         execl("./clk.out", "./clk.out", NULL);
         perror("Clock execution failed");
         exit(-1);
     }
-    sleep(1);
+    sleep(0.25);
     initClk();
     char process_count_str[10]; // Allocate enough space for an integer string
     sprintf(process_count_str, "%d", process_count); 
-    int scheduler_pid = fork();
+    scheduler_pid = fork();
     if (scheduler_pid == 0) {
         if (argc > 3)
             execl("./scheduler.out", "./scheduler.out", argv[2],process_count_str, quantum_str, NULL);
@@ -138,12 +144,17 @@ int main(int argc, char* argv[]) {
     }
 
     // Cleanup
-   // while (getClk() < processes[process_count - 1].arrival_time + 10); // Wait for last process execution
-    int status;
-    waitpid (scheduler_pid, &status, 0);
-    waitpid (clk_pid, &status, 0);
-    clearResources(SIGINT);
+    
+    while (total_runtime  != getClk())
+    {};
+    
+    printf("All processes have been sent and completed!\nShutting down Process Generator and Scheduler.\n");
+
+    
+    raise(SIGINT);
     return 0;
+
+    
 }
 
 void clearResources(int signum) {
@@ -153,6 +164,14 @@ void clearResources(int signum) {
         free(processes);
     if (File_name)
         free(File_name);
-    //destroyClk(true); // Destroy the clock
-    raise(SIGKILL);
+
+    int status;
+
+    kill(scheduler_pid, SIGINT);
+    waitpid (scheduler_pid, &status, scheduler_pid);
+
+    destroyClk(true); // Destroy the clock
+    waitpid (clk_pid, &status, clk_pid);
+
+    exit(1);
 }
