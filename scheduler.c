@@ -157,7 +157,7 @@ void calculate_performance(int total_processes, struct PCB *pcb)
 }
 
 
-
+int processCount = 0;
 int main(int argc, char* argv[]) 
 {
     signal(SIGINT, clearResources);
@@ -213,6 +213,7 @@ int main(int argc, char* argv[])
                 };
                 pcb [i] = newPCB;
                 insertRuntimePriorityQueue(readyQueue, pcb[i].process);
+                processCount++;
                 i++;
             }
 
@@ -246,8 +247,6 @@ int main(int argc, char* argv[])
             }
 
             // Exit condition: no running process and no more processes in the queue
-            // if(finished_counter==process_count)
-            //     break;
             if(!currentPCB)
             {Waiting++;
                 printf("Waiting= %d \n",Waiting);
@@ -260,7 +259,8 @@ int main(int argc, char* argv[])
     else if (algo == 2) 
     {
         readyQueue = createPriorityQueue(process_count);
-        
+        current_time = getClk();
+
         bool recieved=false;
         PCB* pcb[process_count];
         for (int i = 0; i < process_count; i++) {
@@ -381,7 +381,7 @@ int main(int argc, char* argv[])
         
         }
 
-        sleep(1);  // Simulate one time unit
+        while(current_time + 1 > getClk());  // Simulate one time unit
     }
 }
 
@@ -407,8 +407,6 @@ else if (algo == 3)
         current_time = getClk();
         
         // Receive processes sent if any
-        //int rec_value = msgrcv (msgQid, &arrivingProcess, sizeof(arrivingProcess), 0, IPC_NOWAIT);
-
         // fixed this by using while loop instead of if; this is why process 1 gave wrong output
         while (msgrcv (msgQid, &arrivingProcess, sizeof(arrivingProcess), 0, IPC_NOWAIT) != -1)
         { 
@@ -425,15 +423,8 @@ else if (algo == 3)
             pcb [total_processes] = *new_pcb;
             enqueueCircularQueue (cq, pcb [total_processes].process);
             total_processes++;
-            // receivedProcessCount++;
         }   
-        // pcb [] & cq have all arrived processes now
-
-        // while (receivedProcessCount != 0)
-        // {
-        //     enqueueCircularQueue(cq, pcb [total_processes - receivedProcessCount].process); 
-        //     receivedProcessCount--;
-        // }
+        
 
         if (current_process && current_process->state != 2)
         {
@@ -562,7 +553,7 @@ else if (algo == 4)
 
     int prev_run_id;
 
-    while (completed_processes < process_count) 
+    while (true) 
     {
         current_time = getClk();
 
@@ -696,10 +687,6 @@ else if (algo == 4)
             }
         }
         
-        //if (completed_processes == process_count)
-        //{
-            
-        //}
     }
     calculate_performance(process_count, pcb);
 }
@@ -711,10 +698,6 @@ else if (algo == 4)
     fclose(log_file);
     destroyPriorityQueue(readyQueue);
     //clearResources(0);
-    while (true)
-    {
-        /* code */
-    }
     
     return 0;
 }
@@ -763,8 +746,8 @@ void logProcessfinished(FILE* log_file, PCB* pcb, const char* state, int time) {
 
 // Cleanup resources
 void clearResources(int signum) {
+    logSchedulerPerformance(processCount);
     printf("Cleaning up resources as Scheduler...\n");
-     //destroyClk(true);
      destroyPriorityQueue(readyQueue);
      free(WTA);
      free(Process_Wait);
