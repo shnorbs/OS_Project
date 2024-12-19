@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
             i++;
         }
     }
-    total_runtime += processes[1].arrival_time; // Add the arrival time of the first process to total time
+    total_runtime += processes[0].arrival_time; // Add the arrival time of the first process to total time
     free(line);
     fclose(file);
 
@@ -145,19 +145,16 @@ int main(int argc, char* argv[]) {
 
     // Cleanup
     
-    while (total_runtime  != getClk())
-    {};
-    
+    while (total_runtime + 1 > getClk());    
     printf("All processes have been sent and completed!\nShutting down Process Generator and Scheduler.\n");
-
-    
     raise(SIGINT);
     return 0;
 
     
 }
 
-void clearResources(int signum) {
+void clearResources(int signum) 
+{
     printf("Cleaning up resources as Process generator...\n");
     msgctl(msgQid, IPC_RMID, NULL); // Remove message queue
     if (processes)
@@ -165,13 +162,13 @@ void clearResources(int signum) {
     if (File_name)
         free(File_name);
 
-    int status;
-
     kill(scheduler_pid, SIGINT);
-    waitpid (scheduler_pid, &status, scheduler_pid);
+
+    int status;
+    waitpid (scheduler_pid, &status, 0);
 
     destroyClk(true); // Destroy the clock
-    waitpid (clk_pid, &status, clk_pid);
+    waitpid (clk_pid, &status, 0);
 
     exit(1);
 }
