@@ -199,6 +199,7 @@ int main(int argc, char* argv[])
         {
             // Check for incoming processes
             int i = 0;
+            current_time = getClk();
             while (msgrcv(msgQid, &arrivingProcess, sizeof(arrivingProcess), 0, IPC_NOWAIT) != -1) 
             {
                 PCB newPCB = {
@@ -253,7 +254,7 @@ int main(int argc, char* argv[])
             
             }
 
-            sleep(1);  // Simulate one time unit
+            while(current_time + 1 > getClk());  // Simulate one time unit
         }
     }
     else if (algo == 2) 
