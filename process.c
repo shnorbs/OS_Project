@@ -5,13 +5,16 @@ int remainingtime;
 int quantum;
 int current_pid;
 int paused = 0;
+int current_time;
 
 void handle_stop(int sig) 
 {
+    current_time = getClk();
     paused = 1;
     printf("Process %d paused.\n", current_pid);
     while (paused) {
-        sleep(1);  // Sleep while paused to simulate a halt
+        while(current_time +1 > getClk());  // Sleep while paused to simulate a halt
+        current_time++;
     }
 }
 
@@ -32,9 +35,8 @@ int main(int argc, char *argv[]) {
     remainingtime = atoi(argv[1]);
     //int algo = atoi(argv[2]);
     //quantum = (argc > 3) ? atoi(argv[3]) : 1;
-    
+    current_time = getClk();
     printf("Process %d started with remaining time: %d\n", current_pid, remainingtime);
-    int current_time = getClk();
     while (remainingtime > 0) {
         if (!paused) {            
             remainingtime--;

@@ -492,15 +492,11 @@ else if (algo == 3)
         current_process->Last_execution = current_time;
 
         int run_time = (current_process->remaining_time > quanta) ? quanta : current_process->remaining_time;
-        //sleep(run_time);
 
         int start_time = getClk();
         int end_time = start_time + run_time;
 
-        while (getClk() < end_time && current_process->remaining_time > 0) 
-        {
-            // Wait for the quantum to complete
-        }
+        while (getClk() < end_time && current_process->remaining_time > 0);
 
         current_time = getClk();
 
