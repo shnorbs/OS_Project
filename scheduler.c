@@ -14,9 +14,11 @@ int finished_counter=0;
 int Waiting=0;
 int Processes_entered=0;
 
+
 // Tamer's global variables
 int total_time = 0;
 int busy_time = 0;
+int lasttime = 0;
 
 struct msgbuff
 {
@@ -247,13 +249,14 @@ int main(int argc, char* argv[])
             }
 
             // Exit condition: no running process and no more processes in the queue
-            if(!currentPCB)
+            if(!currentPCB && (lasttime+1) == getClk())
             {Waiting++;
                 printf("Waiting= %d \n",Waiting);
+                lasttime = getClk();
             
             }
 
-            while(current_time + 1 > getClk());  // Simulate one time unit
+            while(current_time > getClk());  // Simulate one time unit
         }
     }
     else if (algo == 2) 
@@ -712,7 +715,7 @@ void handleProcessCompletion(int signum) {
 
        
         
-
+        kill(getppid(),SIGUSR1);
         finished_counter++;
         printf("finishedcounter=%d \n",finished_counter);
           // Calculate waiting time
