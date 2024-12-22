@@ -5,6 +5,7 @@
 
 // Function to clear resources on termination
 void clearResources(int signum);
+void ProcessCompleted(int signum);
 
 // Global variables
 int msgQid;
@@ -13,11 +14,12 @@ char* File_name;
 int total_runtime = 0;
 int scheduler_pid;
 int clk_pid;
+int CompletedByScheduler = 0;
 
 int main(int argc, char* argv[]) {
 
     signal(SIGINT, clearResources); // Handle termination signal
-   
+    signal(SIGUSR1, ProcessCompleted);
 
     // Correct memory allocation for File_name
     File_name = strdup(argv[1]);  // Allocate and copy argv[1]
@@ -71,11 +73,13 @@ int main(int argc, char* argv[]) {
         if (line[0] == '#') // Ignore comments
             continue;
 
-        if (sscanf(line, "%d\t%d\t%d\t%d", 
+        // adjusted for PHASE 2 to read one more member
+        if (sscanf(line, "%d\t%d\t%d\t%d\t%d", 
                    &processes[i].id, 
                    &processes[i].arrival_time, 
                    &processes[i].runtime, 
-                   &processes[i].priority) == 4) 
+                   &processes[i].priority,
+                   &processes[i].memsize) == 5) 
         {
             processes[i].prempted=false;
             total_runtime += processes[i].runtime; // Add the runtime of each process into the total time
@@ -98,7 +102,7 @@ int main(int argc, char* argv[]) {
         perror("Clock execution failed");
         exit(-1);
     }
-    sleep(0.25);
+    sleep(1);
     initClk();
     char process_count_str[10]; // Allocate enough space for an integer string
     sprintf(process_count_str, "%d", process_count); 
@@ -145,7 +149,8 @@ int main(int argc, char* argv[]) {
 
     // Cleanup
     
-    while (total_runtime + 1 > getClk());    
+    while (CompletedByScheduler < process_count) {};    
+
     printf("All processes have been sent and completed!\nShutting down Process Generator and Scheduler.\n");
     raise(SIGINT);
     return 0;
@@ -171,4 +176,10 @@ void clearResources(int signum)
     waitpid (clk_pid, &status, 0);
 
     exit(1);
+}
+
+
+void ProcessCompleted(int signum)
+{
+    CompletedByScheduler++;
 }
