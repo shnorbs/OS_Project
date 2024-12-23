@@ -446,7 +446,9 @@ int main(int argc, char* argv[])
     }
     if(algo==1)
     {
-        PCB pcb [process_count];
+        PCB* pcb [process_count];
+        PCB* insertedPCB = NULL;
+
         int total_processes = 0; 
         readyQueue = createPriorityQueue(process_count);
         struct msgbuff1
@@ -472,47 +474,28 @@ int main(int argc, char* argv[])
                     .waiting_time = 0,
                     .pid = -1  // Not yet forked
                 };
-                pcb [i] = newPCB;
-                insertRuntimePriorityQueue(readyQueue, pcb[i].process);
+                pcb [i] = &newPCB;
+                insertRuntimePriorityQueue(readyQueue, pcb[i]->process);
+                insertedPCB = pcb[i];
                 processCount++;
                 i++;
             }
 
             // If no process is running, select the next process
-            if (currentPCB == NULL && readyQueue->size > 0) {
+            if (currentPCB == NULL && readyQueue->size > 0) 
+            {
                 Process nextProcess = removeRuntimePriorityQueue(readyQueue);
+                scheduleNextProcess(insertedPCB->process, pcb);
 
-                // Fork and execute the process
-                pid_t pid = fork();
-                if (pid == 0) {
-                    // Child process simulates execution
-                    char runtimeChar[20];
-                    sprintf(runtimeChar, "%d", nextProcess.runtime);
-                    execl("./process.out", "./process.out", runtimeChar, (char*)NULL);
-                    perror("Failed to execute process");
-                    exit(1);
-                } else if (pid > 0) {
-                    // Parent process tracks the process
-                    currentPCB = (PCB*)malloc(sizeof(PCB));
-                    currentPCB->process = nextProcess;
-                    currentPCB->pid = pid;
-                    currentPCB->state = RUNNING;
-                    currentPCB->start_time = getClk();
-                    currentPCB->remaining_time = nextProcess.runtime;
-                    printf("usdhcusdhuvs\n\n\n");
-                    logProcessEvent(log_file, currentPCB, "started", currentPCB->start_time);
-                } else {
-                    perror("Fork failed");
-                    exit(1);
-                }
+
+                
             }
+
 
             // Exit condition: no running process and no more processes in the queue
             if(!currentPCB && (lasttime+1) == getClk())
-            if(!currentPCB && (lasttime+1) == getClk())
             {Waiting++;
                 printf("Waiting= %d \n",Waiting);
-                lasttime = getClk();
                 lasttime = getClk();
             
             }
@@ -523,7 +506,6 @@ int main(int argc, char* argv[])
     else if (algo == 2) 
     {
     readyQueue = createPriorityQueue(process_count);
-        int lastime=0;
         bool recieved=false;
         PCB* pcb[process_count];
         for (int i = 0; i < process_count; i++) {
@@ -559,21 +541,25 @@ int main(int argc, char* argv[])
 
         if (currentPCB) {
             // Preemption logic
-            if (insertedPCB && currentPCB->process.priority > insertedPCB->process.priority) {
+            if (insertedPCB && currentPCB->process.priority > insertedPCB->process.priority) 
+            {
                 printf("Preempting process %d (pid=%d)\n", currentPCB->process.id, currentPCB->pid);
                 kill(currentPCB->pid, SIGTSTP);  // Stop current process
                  int i = 0;
                 bool found = false;
-                while (i < process_count && !found) {
+                while (i < process_count && !found) 
+                {
                     if (pcb[i] && pcb[i]->process.id == currentPCB->process.id)
-                    {int elapsed_time=getClk()-Start_execution;
-                     pcb[i]->remaining_time-=elapsed_time;
-                     Start_execution=0;
-                       pcb[i]->Last_execution=getClk(); 
+                    {
+                        int elapsed_time=getClk()-Start_execution;
+                        pcb[i]->remaining_time-=elapsed_time;
+                        Start_execution=0;
+                        pcb[i]->Last_execution=getClk(); 
                     }
                     
                     i++;
                 }
+
                 currentPCB->process.prempted = true;
                 currentPCB->state = Blocked;
                 logProcessEvent(log_file, currentPCB, "Blocked", getClk());
@@ -587,13 +573,14 @@ int main(int argc, char* argv[])
             }
             else
             {
-                 if (insertedPCB) {
-                printf("I am inserted process %d",insertedPCB->process.id);
-                insertPriorityPriorityQueue(readyQueue, insertedPCB->process);
-                free(insertedPCB);
-                insertedPCB = NULL;
-                recieved=true;
-            }
+                 if (insertedPCB) 
+                {
+                    printf("I am inserted process %d\n",insertedPCB->process.id);
+                    insertPriorityPriorityQueue(readyQueue, insertedPCB->process);
+                    free(insertedPCB);
+                    insertedPCB = NULL;
+                    recieved=true;
+                }
 
             }
 
@@ -602,7 +589,7 @@ int main(int argc, char* argv[])
         else {
             // If no current process, add new process to the queue
             if (insertedPCB) {
-                printf("I am inserted process %d",insertedPCB->process.id);
+                printf("I am inserted process %d\n",insertedPCB->process.id);
                 insertPriorityPriorityQueue(readyQueue, insertedPCB->process);
                 free(insertedPCB);
                 insertedPCB = NULL;
@@ -638,10 +625,10 @@ int main(int argc, char* argv[])
         // Exit condition: no running process and no more processes in the queue
        if(finished_counter==process_count)
        break;
-        if(!currentPCB&&!insertedPCB&&(lastime+1)==getClk())
+        if(!currentPCB&&!insertedPCB&&(lasttime+1)==getClk())
         {Waiting++;
             printf("Waiting= %d \n",Waiting);
-            lastime=getClk();
+            lasttime=getClk();
         
         }
         
