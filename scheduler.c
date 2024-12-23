@@ -21,6 +21,7 @@ int process_count = 0;
 int total_time = 0;
 int busy_time = 0;
 int lasttime = 0;
+int lasttime = 0;
 
 struct msgbuff
 {
@@ -509,8 +510,10 @@ int main(int argc, char* argv[])
 
             // Exit condition: no running process and no more processes in the queue
             if(!currentPCB && (lasttime+1) == getClk())
+            if(!currentPCB && (lasttime+1) == getClk())
             {Waiting++;
                 printf("Waiting= %d \n",Waiting);
+                lasttime = getClk();
                 lasttime = getClk();
             
             }
