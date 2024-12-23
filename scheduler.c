@@ -94,7 +94,8 @@ MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id)
     MemoryBlock* current = allocator->memory_list;
     
     while (current != NULL) {
-        if (current->is_free && current->size >= required_size) {
+        if (current->is_free && current->size >= required_size) 
+        {
             // Split blocks until we get the right size
             while (current->size > required_size) {
                 int new_size = current->size / 2;
@@ -120,12 +121,34 @@ MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id)
         current = current->next;
     }
     
+
     // Log failed allocation attempt
     fprintf(allocator->memory_log, "At time %d failed to allocate %d bytes for process %d\n",
             getClk(), size, process_id);
     fflush(allocator->memory_log);
     return NULL;
 }
+
+
+    bool isItFree(MemoryBlock* current)
+    {
+
+        if (current->is_free)
+        {
+            printf("Starts from %d\n", current->start_address);
+            return true;
+        }
+        else if (current->next == NULL)
+        {
+            return false;
+        }
+        
+        else
+        {
+            return isItFree(current->next);
+        }
+        
+    }
 
 
 bool areBuddies(MemoryBlock* block1, MemoryBlock* block2) 
@@ -541,7 +564,7 @@ int main(int argc, char* argv[])
 
         if (currentPCB) {
             // Preemption logic
-            if (insertedPCB && currentPCB->process.priority > insertedPCB->process.priority && currentPCB->memory_block->is_free) 
+            if (insertedPCB && currentPCB->process.priority > insertedPCB->process.priority && isItFree(memory_allocator->memory_list)) 
             {
                 printf("Preempting process %d (pid=%d)\n", currentPCB->process.id, currentPCB->pid);
                 kill(currentPCB->pid, SIGTSTP);  // Stop current process
