@@ -541,7 +541,7 @@ int main(int argc, char* argv[])
 
         if (currentPCB) {
             // Preemption logic
-            if (insertedPCB && currentPCB->process.priority > insertedPCB->process.priority) 
+            if (insertedPCB && currentPCB->process.priority > insertedPCB->process.priority && currentPCB->memory_block->is_free) 
             {
                 printf("Preempting process %d (pid=%d)\n", currentPCB->process.id, currentPCB->pid);
                 kill(currentPCB->pid, SIGTSTP);  // Stop current process
