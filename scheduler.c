@@ -435,6 +435,7 @@ int main(int argc, char* argv[])
     WTA=(float*)malloc(sizeof(float)*process_count);
    
     // Initialize runtime-based priority queue
+    // Adjust as needed
     // readyQueue = createPriorityQueue(process_count);
     int msgQid=msgget(MSQKEY,0666|IPC_CREAT);
     // Open log file
@@ -472,7 +473,6 @@ int main(int argc, char* argv[])
                     .pid = -1  // Not yet forked
                 };
                 pcb [i] = newPCB;
-                MemoryBlock* allocated_block = allocateMemory(memory_allocator, pcb[i].process.memsize, pcb[i].process.id);
                 insertRuntimePriorityQueue(readyQueue, pcb[i].process);
                 processCount++;
                 i++;
@@ -499,6 +499,7 @@ int main(int argc, char* argv[])
                     currentPCB->state = RUNNING;
                     currentPCB->start_time = getClk();
                     currentPCB->remaining_time = nextProcess.runtime;
+                    printf("usdhcusdhuvs\n\n\n");
                     logProcessEvent(log_file, currentPCB, "started", currentPCB->start_time);
                 } else {
                     perror("Fork failed");
@@ -508,8 +509,10 @@ int main(int argc, char* argv[])
 
             // Exit condition: no running process and no more processes in the queue
             if(!currentPCB && (lasttime+1) == getClk())
+            if(!currentPCB && (lasttime+1) == getClk())
             {Waiting++;
                 printf("Waiting= %d \n",Waiting);
+                lasttime = getClk();
                 lasttime = getClk();
             
             }
