@@ -130,12 +130,16 @@ MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id)
 }
 
 
-    bool isItFree(MemoryBlock* current)
+    bool isItFree(MemoryBlock* current, Process p)
     {
 
         if (current->is_free)
         {
-            printf("Starts from %d\n", current->start_address);
+            if (current->size < p.memsize)
+            {
+                return false;
+            }
+            
             return true;
         }
         else if (current->next == NULL)
@@ -145,7 +149,7 @@ MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id)
         
         else
         {
-            return isItFree(current->next);
+            return isItFree(current->next, p);
         }
         
     }
@@ -564,7 +568,7 @@ int main(int argc, char* argv[])
 
         if (currentPCB) {
             // Preemption logic
-            if (insertedPCB && currentPCB->process.priority > insertedPCB->process.priority && isItFree(memory_allocator->memory_list)) 
+            if (insertedPCB && currentPCB->process.priority > insertedPCB->process.priority && isItFree(memory_allocator->memory_list, insertedPCB->process)) 
             {
                 printf("Preempting process %d (pid=%d)\n", currentPCB->process.id, currentPCB->pid);
                 kill(currentPCB->pid, SIGTSTP);  // Stop current process
