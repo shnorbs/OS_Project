@@ -13,6 +13,8 @@
 int finished_counter=0;
 int Waiting=0;
 int Processes_entered=0;
+int algo = 0;
+int process_count = 0;
 
 
 // Tamer's global variables
@@ -82,20 +84,21 @@ int getNextPowerOf2(int size)
 
 
 // Allocate memory
-MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id) 
-{
+MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id) {
+    if (!allocator || !allocator->memory_log) {
+        printf("Error: Memory allocator or log file not initialized\n");
+        return NULL;
+    }
+
     int required_size = getNextPowerOf2(size);
     MemoryBlock* current = allocator->memory_list;
     
-    while (current != NULL) 
-    {
-        if (current->is_free && current->size >= required_size) 
-        {
+    while (current != NULL) {
+        if (current->is_free && current->size >= required_size) {
             // Split blocks until we get the right size
-            while (current->size > required_size) 
-            {
+            while (current->size > required_size) {
                 int new_size = current->size / 2;
-                MemoryBlock* buddy = (MemoryBlock*) malloc (sizeof(MemoryBlock));
+                MemoryBlock* buddy = (MemoryBlock*)malloc(sizeof(MemoryBlock));
                 
                 buddy->size = new_size;
                 buddy->start_address = current->start_address + new_size;
@@ -107,13 +110,20 @@ MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id)
             }
             
             current->is_free = false;
+            // Ensure logging happens and buffer is flushed
             fprintf(allocator->memory_log, "At time %d allocated %d bytes for process %d from %d to %d\n",
                     getClk(), size, process_id, current->start_address, 
                     current->start_address + current->size - 1);
+            fflush(allocator->memory_log);
             return current;
         }
         current = current->next;
     }
+    
+    // Log failed allocation attempt
+    fprintf(allocator->memory_log, "At time %d failed to allocate %d bytes for process %d\n",
+            getClk(), size, process_id);
+    fflush(allocator->memory_log);
     return NULL;
 }
 
@@ -268,6 +278,42 @@ FILE* log_file;
 FILE* perf_file;
 
 
+BuddyAllocator* memory_allocator;
+WaitingQueue* memory_waiting_queue;
+
+void initializeMemoryManagement() {
+    memory_allocator = initBuddyAllocator(1024);
+    memory_waiting_queue = createWaitingQueue();
+
+    fprintf(memory_allocator->memory_log, "# Memory Log Start - Total Memory: 1024 bytes\n");
+    fflush(memory_allocator->memory_log);
+}
+
+// Function to check waiting queue after memory is freed
+void checkWaitingQueue() {
+    while (memory_waiting_queue->size > 0) {
+        PCB* waiting_pcb = dequeueWaiting(memory_waiting_queue);
+        MemoryBlock* allocated_block = allocateMemory(memory_allocator, 
+                                                    waiting_pcb->process.memsize,
+                                                    waiting_pcb->process.id);
+        
+        if (allocated_block != NULL) {
+            waiting_pcb->memory_block = allocated_block;
+            // Add back to appropriate scheduling queue based on algorithm
+            if (algo == 1) {
+                insertRuntimePriorityQueue(readyQueue, waiting_pcb->process);
+            } else if (algo == 2) {
+                insertPriorityPriorityQueue(readyQueue, waiting_pcb->process);
+            } // ... handle other algorithms
+        } else {
+            // If still can't allocate, put back in waiting queue
+            enqueueWaiting(memory_waiting_queue, waiting_pcb);
+            break;
+        }
+    }
+}
+
+
 // MLFQ specific structures
 struct MLFQ 
 {
@@ -306,7 +352,7 @@ void resetProcessPriority(struct PCB *process)
 }
 
 
-void scheduleNextProcess(Process nextProcess,PCB* pcb[]);
+bool scheduleNextProcess(Process nextProcess,PCB* pcb[]);
 void logProcessfinished(FILE* log_file, PCB* pcb, const char* state, int time);
 void logSchedulerPerformance(int processCount);
 // Function prototypes
@@ -376,9 +422,11 @@ int main(int argc, char* argv[])
     signal(SIGINT, clearResources);
     signal(SIGCHLD, handleProcessCompletion);  // Handle child process termination
     initClk();
-    int algo=atoi(argv[1]);
+    initializeMemoryManagement();
+
+    algo=atoi(argv[1]);
     int current_time;
-    int process_count = atoi(argv[2]);
+    process_count = atoi(argv[2]);
     int quanta = (argc > 3) ? atoi(argv[3]) : 0;
     if (quanta != 0)
         printf("quanta is %d\n", quanta);
@@ -451,7 +499,7 @@ int main(int argc, char* argv[])
                     currentPCB->state = RUNNING;
                     currentPCB->start_time = getClk();
                     currentPCB->remaining_time = nextProcess.runtime;
-                    
+                    printf("usdhcusdhuvs\n\n\n");
                     logProcessEvent(log_file, currentPCB, "started", currentPCB->start_time);
                 } else {
                     perror("Fork failed");
@@ -511,7 +559,7 @@ int main(int argc, char* argv[])
             // Preemption logic
             if (insertedPCB && currentPCB->process.priority > insertedPCB->process.priority) {
                 printf("Preempting process %d (pid=%d)\n", currentPCB->process.id, currentPCB->pid);
-                kill(currentPCB->pid, SIGSTOP);  // Stop current process
+                kill(currentPCB->pid, SIGTSTP);  // Stop current process
                  int i = 0;
                 bool found = false;
                 while (i < process_count && !found) {
@@ -927,21 +975,24 @@ void handleProcessCompletion(int signum) {
         currentPCB->finish_time = getClk();
         currentPCB->state = FINISHED;
 
-       
+        // Free memory
+        freeMemory(memory_allocator, currentPCB->memory_block, currentPCB->process.id);
         
-        kill(getppid(),SIGUSR1);
+        // Check waiting queue for processes that can now be allocated
+        checkWaitingQueue();
+
         finished_counter++;
-        printf("finishedcounter=%d \n",finished_counter);
-          // Calculate waiting time
+        printf("finishedcounter=%d \n", finished_counter);
+        
         currentPCB->waiting_time = currentPCB->finish_time - currentPCB->process.arrival_time - currentPCB->process.runtime;   
-        // Log completion
+
+        
         logProcessfinished(log_file, currentPCB, "finished", currentPCB->finish_time);
 
-
-       
         if(currentPCB)
-        free(currentPCB);
+            free(currentPCB);
         currentPCB = NULL;
+        kill(getppid(),SIGUSR1);
     }
 }
 
@@ -963,15 +1014,37 @@ void logProcessfinished(FILE* log_file, PCB* pcb, const char* state, int time) {
 
 // Cleanup resources
 void clearResources(int signum) {
-    logSchedulerPerformance(processCount);
+    logSchedulerPerformance(process_count);
     printf("Cleaning up resources as Scheduler...\n");
-     destroyPriorityQueue(readyQueue);
-     free(WTA);
-     free(Process_Wait);
-     printf("Exiting\n");
-     exit(1);
+    // Free all memory blocks
+    MemoryBlock* current = memory_allocator->memory_list;
+    while (current != NULL) {
+        MemoryBlock* next = current->next;
+        free(current);
+        current = next;
+    }
     
+    // Close memory log file
+    fclose(memory_allocator->memory_log);
+    
+    // Free allocator
+    free(memory_allocator);
+    
+    // Free waiting queue
+    while (memory_waiting_queue->size > 0) {
+        PCB* pcb = dequeueWaiting(memory_waiting_queue);
+        free(pcb);
+    }
+    free(memory_waiting_queue);
+    
+    //destroyClk(true);
+    destroyPriorityQueue(readyQueue);
+    free(WTA);
+    free(Process_Wait);
+    printf("Exiting\n");
+    exit(1);
 }
+
 void logSchedulerPerformance(int processCount) {
     float totalWTA = 0;
     float totalWait = 0;
@@ -1000,31 +1073,53 @@ void logSchedulerPerformance(int processCount) {
     
     
 }
-void scheduleNextProcess(Process nextProcess,PCB* pcb[]) {
+
+bool scheduleNextProcess(Process nextProcess, PCB* pcb[]) {
+    // Try to allocate memory first
+    MemoryBlock* allocated_block = allocateMemory(memory_allocator, 
+                                                nextProcess.memsize,
+                                                nextProcess.id);
+    
+    if (allocated_block == NULL) {
+        // If memory allocation fails, add to waiting queue
+        PCB* waiting_pcb = (PCB*)malloc(sizeof(PCB));
+        waiting_pcb->process = nextProcess;
+        waiting_pcb->state = Ready;
+        waiting_pcb->remaining_time = nextProcess.runtime;
+        waiting_pcb->waiting_time = 0;
+        enqueueWaiting(memory_waiting_queue, waiting_pcb);
+        return false;
+    }
+
+    // If memory allocation succeeds, proceed with process creation
     pid_t pid = fork();
-            if (pid == 0) {
-                // Child process simulates execution
-                char runtimeChar[20];
-                sprintf(runtimeChar, "%d", nextProcess.runtime);
-                execl("./process.out", "./process.out", runtimeChar, (char*)NULL);
-                perror("Failed to execute process");
-                exit(1);
-            } else if (pid > 0) {
-                // Parent process tracks the process
-                currentPCB = (PCB*)malloc(sizeof(PCB));
-                Start_execution=getClk();
-                currentPCB->process = nextProcess;
-                currentPCB->pid = pid;
-                currentPCB->state = RUNNING;
-                currentPCB->start_time = getClk();
-                currentPCB->waiting_time=getClk()-currentPCB->process.arrival_time;
-                currentPCB->remaining_time = nextProcess.runtime;
-                pcb[Processes_entered]=currentPCB;
-                Processes_entered++;
-                printf(" I am process%d with pid=%d \n", currentPCB->process.id,currentPCB->pid);
-                logProcessEvent(log_file, currentPCB, "started", currentPCB->start_time);
-            } else {
-                perror("Fork failed");
-                exit(1);
-            }
+    if (pid == 0) {
+        // Child process simulates execution
+        char runtimeChar[20];
+        sprintf(runtimeChar, "%d", nextProcess.runtime);
+        execl("./process.out", "./process.out", runtimeChar, (char*)NULL);
+        perror("Failed to execute process");
+        exit(1);
+    } else if (pid > 0) {
+        // Parent process tracks the process
+        currentPCB = (PCB*)malloc(sizeof(PCB));
+        Start_execution = getClk();
+        currentPCB->process = nextProcess;
+        currentPCB->pid = pid;
+        currentPCB->state = RUNNING;
+        currentPCB->memory_block = allocated_block;
+        busy_time++;
+        currentPCB->start_time = getClk();
+        currentPCB->waiting_time = getClk() - currentPCB->process.arrival_time;
+        currentPCB->remaining_time = nextProcess.runtime;
+        pcb[Processes_entered] = currentPCB;
+        Processes_entered++;
+        
+        logProcessEvent(log_file, currentPCB, "started", currentPCB->start_time);
+        return true;
+    } else {
+        perror("Fork failed");
+        exit(1);
+    }
+    return false;
 }
