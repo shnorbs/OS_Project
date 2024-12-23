@@ -498,8 +498,10 @@ int main(int argc, char* argv[])
 
             // Exit condition: no running process and no more processes in the queue
             if(!currentPCB && (lasttime+1) == getClk())
+            if(!currentPCB && (lasttime+1) == getClk())
             {Waiting++;
                 printf("Waiting= %d \n",Waiting);
+                lasttime = getClk();
                 lasttime = getClk();
             
             }
