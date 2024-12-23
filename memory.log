@@ -1,11 +1,5 @@
 # Memory Log Start - Total Memory: 1024 bytes
-At time 4 allocated 197 bytes for process 1 from 0 to 255
-At time 15 freed 256 bytes from process 1 from 0 to 255
-At time 15 allocated 216 bytes for process 2 from 0 to 255
-At time 17 freed 256 bytes from process 2 from 0 to 255
-At time 17 allocated 193 bytes for process 4 from 0 to 255
-At time 24 freed 256 bytes from process 4 from 0 to 255
-At time 24 allocated 34 bytes for process 5 from 0 to 63
-At time 31 freed 64 bytes from process 5 from 0 to 63
-At time 31 allocated 128 bytes for process 3 from 0 to 127
-At time 37 freed 128 bytes from process 3 from 0 to 127
+At time 4 allocated 600 bytes for process 1 from 0 to 1023
+At time 4 failed to allocate 600 bytes for process 1
+At time 7 failed to allocate 600 bytes for process 2
+At time 8 failed to allocate 600 bytes for process 3

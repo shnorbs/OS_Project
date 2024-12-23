@@ -84,8 +84,10 @@ int getNextPowerOf2(int size)
 
 
 // Allocate memory
-MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id) {
-    if (!allocator || !allocator->memory_log) {
+MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id) 
+{
+    if (!allocator || !allocator->memory_log)
+    {
         printf("Error: Memory allocator or log file not initialized\n");
         return NULL;
     }
@@ -93,10 +95,12 @@ MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id)
     int required_size = getNextPowerOf2(size);
     MemoryBlock* current = allocator->memory_list;
     
-    while (current != NULL) {
+    while (current != NULL) 
+    {
         if (current->is_free && current->size >= required_size) {
             // Split blocks until we get the right size
-            while (current->size > required_size) {
+            while (current->size > required_size) 
+            {
                 int new_size = current->size / 2;
                 MemoryBlock* buddy = (MemoryBlock*)malloc(sizeof(MemoryBlock));
                 
@@ -293,9 +297,7 @@ void initializeMemoryManagement() {
 void checkWaitingQueue() {
     while (memory_waiting_queue->size > 0) {
         PCB* waiting_pcb = dequeueWaiting(memory_waiting_queue);
-        MemoryBlock* allocated_block = allocateMemory(memory_allocator, 
-                                                    waiting_pcb->process.memsize,
-                                                    waiting_pcb->process.id);
+        MemoryBlock* allocated_block = allocateMemory(memory_allocator, waiting_pcb->process.memsize, waiting_pcb->process.id);
         
         if (allocated_block != NULL) {
             waiting_pcb->memory_block = allocated_block;
@@ -532,9 +534,10 @@ int main(int argc, char* argv[])
                 .pid = -1
             };
             
-            insertedPCB = newPCB;
-            
-            printf("process%d recieved",arrivingProcess.p.id);
+
+                insertedPCB = newPCB;
+
+            printf("process%d recieved\n", arrivingProcess.p.id);
             
             
         }
@@ -589,25 +592,49 @@ int main(int argc, char* argv[])
         else {
             // If no current process, add new process to the queue
             if (insertedPCB) {
-                printf("I am inserted process %d\n",insertedPCB->process.id);
-                insertPriorityPriorityQueue(readyQueue, insertedPCB->process);
-                free(insertedPCB);
-                insertedPCB = NULL;
-                recieved=true;
+
+                MemoryBlock* allocated_block = allocateMemory(memory_allocator, insertedPCB->process.memsize, insertedPCB->process.id);
+                if (allocated_block == NULL)
+                {
+                    PCB* waiting_pcb = (PCB*)malloc(sizeof(PCB));
+                    waiting_pcb->process = insertedPCB->process;
+                    waiting_pcb->state = Ready;
+                    waiting_pcb->remaining_time = insertedPCB->process.runtime;
+                    waiting_pcb->waiting_time = 0;
+                    enqueueWaiting(memory_waiting_queue, waiting_pcb);
+                    printf("Process size too large. Placed in waiting queue.\n");
+                    free(insertedPCB);
+                    insertedPCB = NULL;
+                }
+                
+                else
+                {
+                    printf("I am inserted process %d\n",insertedPCB->process.id);
+                    insertPriorityPriorityQueue(readyQueue, insertedPCB->process);
+                    free(insertedPCB);
+                    insertedPCB = NULL;
+                    recieved=true;
+                }
             }
         }
 
         // Schedule or resume the next process
-        if (currentPCB == NULL && readyQueue->size > 0) {
+        if (currentPCB == NULL && readyQueue->size > 0) 
+        {
             Process nextProcess = removePriorityPriorityQueue(readyQueue);
 
-            if (!nextProcess.prempted) {
+            if (!nextProcess.prempted) 
+            {
                 scheduleNextProcess(nextProcess, pcb);
-            } else {
+            } 
+            
+            else {
                 int i = 0;
                 bool found = false;
-                while (i < process_count && !found) {
-                    if (pcb[i] && pcb[i]->process.id == nextProcess.id) {
+                while (i < process_count && !found) 
+                {
+                    if (pcb[i] && pcb[i]->process.id == nextProcess.id) 
+                    {
                         printf("Resuming process %d (pid=%d)\n", nextProcess.id, pcb[i]->pid);
                         found = true;
                         nextProcess.prempted = false;
@@ -617,19 +644,18 @@ int main(int argc, char* argv[])
                         logProcessEvent(log_file, pcb[i], "resumed", getClk());
                         currentPCB = pcb[i];
                     }
+
                     i++;
                 }
             }
         }
 
         // Exit condition: no running process and no more processes in the queue
-       if(finished_counter==process_count)
-       break;
-        if(!currentPCB&&!insertedPCB&&(lasttime+1)==getClk())
-        {Waiting++;
+        if(!currentPCB && !insertedPCB && (lasttime+1) == getClk())
+        {
+            Waiting++;
             printf("Waiting= %d \n",Waiting);
             lasttime=getClk();
-        
         }
         
     }
@@ -950,9 +976,7 @@ else if (algo == 4)
     if (algo < 3)
         logSchedulerPerformance(finished_counter); //Not working for some reason implementation below
     fclose(log_file);
-    destroyPriorityQueue(readyQueue);
-    //clearResources(0);
-    
+    destroyPriorityQueue(readyQueue);    
     return 0;
 }
 
@@ -1065,9 +1089,7 @@ void logSchedulerPerformance(int processCount) {
 
 bool scheduleNextProcess(Process nextProcess, PCB* pcb[]) {
     // Try to allocate memory first
-    MemoryBlock* allocated_block = allocateMemory(memory_allocator, 
-                                                nextProcess.memsize,
-                                                nextProcess.id);
+    MemoryBlock* allocated_block = allocateMemory(memory_allocator, nextProcess.memsize, nextProcess.id);
     
     if (allocated_block == NULL) {
         // If memory allocation fails, add to waiting queue
