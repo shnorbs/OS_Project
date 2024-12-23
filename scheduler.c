@@ -21,7 +21,6 @@ int process_count = 0;
 int total_time = 0;
 int busy_time = 0;
 int lasttime = 0;
-int lasttime = 0;
 
 struct msgbuff
 {
