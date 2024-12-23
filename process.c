@@ -5,17 +5,27 @@ int remainingtime;
 int quantum;
 int current_pid;
 int paused = 0;
-int current_time;
-
+int oldtime=0;
 void handle_stop(int sig) 
 {
-    current_time = getClk();
     paused = 1;
+    
     printf("Process %d paused.\n", current_pid);
     while (paused) {
-        while(current_time +1 > getClk());  // Sleep while paused to simulate a halt
-        current_time++;
+        //sleep(1);  // Sleep while paused to simulate a halt
     }
+   
+}
+
+void handle_stop2(int sig) 
+{
+    paused = 1;
+    remainingtime++;
+    printf("Process %d paused.\n", current_pid);
+    while (paused) {
+        //sleep(1);  // Sleep while paused to simulate a halt
+    }
+   
 }
 
 void handle_cont(int sig) 
@@ -24,9 +34,11 @@ void handle_cont(int sig)
     printf("Process %d resumed.\n", current_pid);
 }
 
+
 int main(int argc, char *argv[]) {
     // Signal handling
     signal(SIGSTOP, handle_stop);
+    signal(SIGTSTP,handle_stop2);
     signal(SIGCONT, handle_cont);
     
     current_pid = getpid();
@@ -35,16 +47,22 @@ int main(int argc, char *argv[]) {
     remainingtime = atoi(argv[1]);
     //int algo = atoi(argv[2]);
     //quantum = (argc > 3) ? atoi(argv[3]) : 1;
-    current_time = getClk();
+    
     printf("Process %d started with remaining time: %d\n", current_pid, remainingtime);
+    
     while (remainingtime > 0) {
-        if (!paused) {            
+        if (!paused) {
+            // Simulate work
+            //sleep(1);
+            oldtime=remainingtime;
+            int current_time = getClk();
+            
             remainingtime--;
-
-
-            while (getClk() != current_time + 1); // removed sleep(1) and used a while loop instead
             printf("Process %d remaining time: %d\n", current_pid, remainingtime);
-            current_time++;
+            while (getClk() < current_time + 1)
+            {
+                // absolute cinema
+            }
         }
     }
     

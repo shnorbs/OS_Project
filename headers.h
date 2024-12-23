@@ -64,7 +64,3 @@ void destroyClk(bool terminateAll)
     }
 }
 
-
-
-
-

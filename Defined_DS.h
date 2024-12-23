@@ -11,6 +11,7 @@ typedef struct Process {
     int runtime;
     int priority;
     bool prempted;
+    int memsize;
 } Process;
 
 // Circular Queue Implementation
@@ -27,7 +28,7 @@ typedef struct PriorityQueue {
     int capacity;
 } PriorityQueue;
 
-// Circular Queue Functions
+// Circular Queue Functions remain the same
 CircularQueue* createCircularQueue(int capacity) {
     CircularQueue* queue = (CircularQueue*)malloc(sizeof(CircularQueue));
     queue->capacity = capacity;
@@ -57,7 +58,7 @@ void enqueueCircularQueue(CircularQueue* queue, Process process) {
 Process dequeueCircularQueue(CircularQueue* queue) {
     if (isCircularQueueEmpty(queue)) {
         printf("Circular Queue Underflow\n");
-        Process dummy = {-1, -1, -1, -1};
+        Process dummy = { -1, -1, -1, -1 };
         return dummy;
     }
     Process process = queue->array[queue->front];
@@ -81,26 +82,42 @@ void swapProcesses(Process* a, Process* b) {
     *b = temp;
 }
 
-//sort according to priority
+// Modified heapify functions to consider arrival time
 
 void heapifyUpPriority(PriorityQueue* pq, int index) {
-    while (index > 0 && pq->array[index].priority < pq->array[(index - 1) / 2].priority) {
-        swapProcesses(&pq->array[index], &pq->array[(index - 1) / 2]);
-        index = (index - 1) / 2;
+    while (index > 0) {
+        int parent = (index - 1) / 2;
+        // Compare priority first
+        if (pq->array[index].priority < pq->array[parent].priority ||
+            // If priorities are equal, compare arrival times
+            (pq->array[index].priority == pq->array[parent].priority &&
+                pq->array[index].arrival_time < pq->array[parent].arrival_time)) {
+            swapProcesses(&pq->array[index], &pq->array[parent]);
+            index = parent;
+        }
+        else {
+            break;
+        }
     }
 }
-
-
-
 
 void heapifyDownPriority(PriorityQueue* pq, int index) {
     int smallest = index;
     int left = 2 * index + 1;
     int right = 2 * index + 2;
 
-    if (left < pq->size && pq->array[left].priority < pq->array[smallest].priority)
+    // Check left child
+    if (left < pq->size &&
+        (pq->array[left].priority < pq->array[smallest].priority ||
+            (pq->array[left].priority == pq->array[smallest].priority &&
+                pq->array[left].arrival_time < pq->array[smallest].arrival_time)))
         smallest = left;
-    if (right < pq->size && pq->array[right].priority < pq->array[smallest].priority)
+
+    // Check right child
+    if (right < pq->size &&
+        (pq->array[right].priority < pq->array[smallest].priority ||
+            (pq->array[right].priority == pq->array[smallest].priority &&
+                pq->array[right].arrival_time < pq->array[smallest].arrival_time)))
         smallest = right;
 
     if (smallest != index) {
@@ -109,12 +126,20 @@ void heapifyDownPriority(PriorityQueue* pq, int index) {
     }
 }
 
-//Sort accoriding to runtime
-
 void heapifyUpRuntime(PriorityQueue* pq, int index) {
-    while (index > 0 && pq->array[index].runtime < pq->array[(index - 1) / 2].runtime) {
-        swapProcesses(&pq->array[index], &pq->array[(index - 1) / 2]);
-        index = (index - 1) / 2;
+    while (index > 0) {
+        int parent = (index - 1) / 2;
+        // Compare runtime first
+        if (pq->array[index].runtime < pq->array[parent].runtime ||
+            // If runtimes are equal, compare arrival times
+            (pq->array[index].runtime == pq->array[parent].runtime &&
+                pq->array[index].arrival_time < pq->array[parent].arrival_time)) {
+            swapProcesses(&pq->array[index], &pq->array[parent]);
+            index = parent;
+        }
+        else {
+            break;
+        }
     }
 }
 
@@ -123,9 +148,18 @@ void heapifyDownRuntime(PriorityQueue* pq, int index) {
     int left = 2 * index + 1;
     int right = 2 * index + 2;
 
-    if (left < pq->size && pq->array[left].runtime < pq->array[smallest].runtime)
+    // Check left child
+    if (left < pq->size &&
+        (pq->array[left].runtime < pq->array[smallest].runtime ||
+            (pq->array[left].runtime == pq->array[smallest].runtime &&
+                pq->array[left].arrival_time < pq->array[smallest].arrival_time)))
         smallest = left;
-    if (right < pq->size && pq->array[right].runtime < pq->array[smallest].runtime)
+
+    // Check right child
+    if (right < pq->size &&
+        (pq->array[right].runtime < pq->array[smallest].runtime ||
+            (pq->array[right].runtime == pq->array[smallest].runtime &&
+                pq->array[right].arrival_time < pq->array[smallest].arrival_time)))
         smallest = right;
 
     if (smallest != index) {
@@ -134,7 +168,7 @@ void heapifyDownRuntime(PriorityQueue* pq, int index) {
     }
 }
 
-
+// Rest of the functions remain the same
 void insertPriorityPriorityQueue(PriorityQueue* pq, Process process) {
     if (pq->size == pq->capacity) {
         printf("Priority Queue Overflow\n");
@@ -144,8 +178,6 @@ void insertPriorityPriorityQueue(PriorityQueue* pq, Process process) {
     heapifyUpPriority(pq, pq->size);
     pq->size++;
 }
-
-
 
 void insertRuntimePriorityQueue(PriorityQueue* pq, Process process) {
     if (pq->size == pq->capacity) {
@@ -160,7 +192,7 @@ void insertRuntimePriorityQueue(PriorityQueue* pq, Process process) {
 Process removePriorityPriorityQueue(PriorityQueue* pq) {
     if (pq->size == 0) {
         printf("Priority Queue Underflow\n");
-        Process dummy = {-1, -1, -1, -1};
+        Process dummy = { -1, -1, -1, -1 };
         return dummy;
     }
     Process root = pq->array[0];
@@ -169,12 +201,10 @@ Process removePriorityPriorityQueue(PriorityQueue* pq) {
     return root;
 }
 
-
-
 Process removeRuntimePriorityQueue(PriorityQueue* pq) {
     if (pq->size == 0) {
         printf("Priority Queue Underflow\n");
-        Process dummy = {-1, -1, -1, -1};
+        Process dummy = { -1, -1, -1, -1 };
         return dummy;
     }
     Process root = pq->array[0];
@@ -185,9 +215,8 @@ Process removeRuntimePriorityQueue(PriorityQueue* pq) {
 
 void destroyPriorityQueue(PriorityQueue* pq) {
     if (pq != NULL) {
-        free(pq->array); // Free the array holding the processes
-        free(pq);        // Free the PriorityQueue structure itself
+        free(pq->array);
+        free(pq);
     }
 }
-
 #endif

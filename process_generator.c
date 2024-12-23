@@ -73,11 +73,13 @@ int main(int argc, char* argv[]) {
         if (line[0] == '#') // Ignore comments
             continue;
 
-        if (sscanf(line, "%d\t%d\t%d\t%d", 
+        // adjusted for PHASE 2 to read one more member
+        if (sscanf(line, "%d\t%d\t%d\t%d\t%d", 
                    &processes[i].id, 
                    &processes[i].arrival_time, 
                    &processes[i].runtime, 
-                   &processes[i].priority) == 4) 
+                   &processes[i].priority,
+                   &processes[i].memsize) == 5) 
         {
             processes[i].prempted=false;
             total_runtime += processes[i].runtime; // Add the runtime of each process into the total time
