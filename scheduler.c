@@ -18,6 +18,7 @@ int process_count = 0;
 
 
 // Tamer's global variables
+int current_time = 0;
 int total_time = 0;
 int busy_time = 0;
 int lasttime = 0;
@@ -84,8 +85,10 @@ int getNextPowerOf2(int size)
 
 
 // Allocate memory
-MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id) {
-    if (!allocator || !allocator->memory_log) {
+MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id) 
+{
+    if (!allocator || !allocator->memory_log) 
+    {
         printf("Error: Memory allocator or log file not initialized\n");
         return NULL;
     }
@@ -93,8 +96,10 @@ MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id)
     int required_size = getNextPowerOf2(size);
     MemoryBlock* current = allocator->memory_list;
     
-    while (current != NULL) {
-        if (current->is_free && current->size >= required_size) {
+    while (current != NULL) 
+    {
+        if (current->is_free && current->size >= required_size) 
+        {
             // Split blocks until we get the right size
             while (current->size > required_size) {
                 int new_size = current->size / 2;
@@ -112,7 +117,7 @@ MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id)
             current->is_free = false;
             // Ensure logging happens and buffer is flushed
             fprintf(allocator->memory_log, "At time %d allocated %d bytes for process %d from %d to %d\n",
-                    getClk(), size, process_id, current->start_address, 
+                    current_time, size, process_id, current->start_address, 
                     current->start_address + current->size - 1);
             fflush(allocator->memory_log);
             return current;
@@ -283,7 +288,8 @@ FILE* perf_file;
 BuddyAllocator* memory_allocator;
 WaitingQueue* memory_waiting_queue;
 
-void initializeMemoryManagement() {
+void initializeMemoryManagement() 
+{
     memory_allocator = initBuddyAllocator(1024);
     memory_waiting_queue = createWaitingQueue();
 
@@ -292,14 +298,17 @@ void initializeMemoryManagement() {
 }
 
 // Function to check waiting queue after memory is freed
-void checkWaitingQueue() {
-    while (memory_waiting_queue->size > 0) {
+void checkWaitingQueue() 
+{
+    while (memory_waiting_queue->size > 0) 
+    {
         PCB* waiting_pcb = dequeueWaiting(memory_waiting_queue);
         MemoryBlock* allocated_block = allocateMemory(memory_allocator, 
                                                     waiting_pcb->process.memsize,
                                                     waiting_pcb->process.id);
         
-        if (allocated_block != NULL) {
+        if (allocated_block != NULL) 
+        {
             waiting_pcb->memory_block = allocated_block;
             // Add back to appropriate scheduling queue based on algorithm
             if (algo == 1) {
@@ -309,7 +318,9 @@ void checkWaitingQueue() {
             } else if (algo == 3) {
                 enqueueCircularQueue (cq, waiting_pcb->process);
             }
-        } else {
+        } 
+        else 
+        {
             // If still can't allocate, put back in waiting queue
             enqueueWaiting(memory_waiting_queue, waiting_pcb);
             break;
@@ -410,7 +421,7 @@ void calculate_performance(int total_processes, struct PCB *pcb)
     float avg_WTA = total_WTA / total_processes;
     float avg_waiting = total_waiting / total_processes;
 
-    float CPU_utilization = (float)busy_time / total_time * 100;
+    float CPU_utilization = (float)busy_time / getClk() * 100;
 
     fprintf(perf_file, "CPU utilization = %.2f%%\n", CPU_utilization);
     fprintf(perf_file, "Avg WTA = %.2f\n", avg_WTA);
@@ -429,7 +440,7 @@ int main(int argc, char* argv[])
     initializeMemoryManagement();
 
     algo=atoi(argv[1]);
-    int current_time;
+    //int current_time;
     process_count = atoi(argv[2]);
     int quanta = (argc > 3) ? atoi(argv[3]) : 0;
     if (quanta != 0)
@@ -643,18 +654,18 @@ int main(int argc, char* argv[])
 
 else if (algo == 3)
 {
-    cq =  createCircularQueue (process_count);   // ready queue
-
+    cq = createCircularQueue(process_count);
     log_file = fopen("scheduler.log", "w");
     perf_file = fopen("scheduler.perf", "w");
 
-    int current_time = getClk();
+    int quantum_progress = 0;  // track progress in current quantum
+    current_time = getClk();
     int total_processes = 0;
     int completed_processes = 0;
-    int receivedProcessCount = 0;
 
+    PCB *prev_process = NULL;
     PCB *current_process = NULL;
-    PCB pcb [process_count];
+    PCB pcb[process_count];
 
     struct msgbuff arrivingProcess;
 
@@ -662,137 +673,127 @@ else if (algo == 3)
     {   
         current_time = getClk();
         
-        // Receive processes sent if any
-        // fixed this by using while loop instead of if; this is why process 1 gave wrong output
-        while (msgrcv (msgQid, &arrivingProcess, sizeof(arrivingProcess), 0, IPC_NOWAIT) != -1)
+        // check for new processes every second
+        while (msgrcv(msgQid, &arrivingProcess, sizeof(arrivingProcess), 0, IPC_NOWAIT) != -1)
         { 
-            printf ("Process %d received at time %d\n", arrivingProcess.p.id, getClk());
+            printf("Process %d received at time %d\n", arrivingProcess.p.id, current_time);
             struct PCB *new_pcb = &pcb[total_processes];
 
             new_pcb->process = arrivingProcess.p; 
             new_pcb->remaining_time = arrivingProcess.p.runtime; 
-            new_pcb->state = 0;     // Waiting  
+            new_pcb->state = 0;    
             new_pcb->waiting_time = 0; 
             new_pcb->executionTime = 0; 
             new_pcb->pid = -1; 
 
-            pcb [total_processes] = *new_pcb;
+            pcb[total_processes] = *new_pcb;
 
-            // allocate memory for new processes if size is available, otherwise add to waiting list
-            MemoryBlock * newBlock = allocateMemory (memory_allocator, new_pcb->process.memsize, new_pcb->process.id);
+            // allocate memory immediately
+            MemoryBlock *newBlock = allocateMemory(memory_allocator, new_pcb->process.memsize, new_pcb->process.id);
             if (newBlock != NULL)
             {
                 new_pcb->memory_block = newBlock;
-                enqueueCircularQueue (cq, pcb [total_processes].process);
+                enqueueCircularQueue(cq, pcb[total_processes].process);
             }
             else enqueueWaiting(memory_waiting_queue, new_pcb);
             
             total_processes++;
         }   
-        
 
-        if (current_process && current_process->state != 2)
+        // process selection
+        if (!current_process || quantum_progress >= quanta || current_process->remaining_time <= 0)
         {
-            enqueueCircularQueue (cq, current_process->process);
-            current_process = NULL;
-        }
-
-        // loop again if queue is empty
-        if (isCircularQueueEmpty(cq)) 
-        { 
-            continue; 
-        }
-
-        // Select process to run
-        Process currentProcess = dequeueCircularQueue (cq);
-        // Find PCB for this process 
-        for (int i = 0; i < total_processes; i++) 
-        {
-            if (pcb[i].process.id == currentProcess.id) 
+            // save previous process if its not finished
+            if (current_process && current_process->remaining_time > 0)
             {
-                current_process = &pcb[i]; 
-                break; 
-            } 
-        }
+                kill(current_process->pid, SIGSTOP);
+                write_log(current_process, "stopped", current_time);
 
-
-        // fork a new process or continue an existing one
-        if (current_process->pid == -1)
-        {
-            current_process->start_time = current_time;
-            current_process->pid = fork();
-            if (current_process->pid == 0)
-            {
-                char remaining_time_str[10]; 
-
-                sprintf(remaining_time_str, "%d", current_process->remaining_time); 
-
-                execl("./process.out", "./process.out", remaining_time_str, argv[1], argv[3], NULL); 
-                perror("execl failed"); 
-                exit(1);
+                current_process->state = 0;
+                current_process->Last_execution = current_time;
+                
+                enqueueCircularQueue(cq, current_process->process);
+                prev_process = current_process;
             }
-            current_process->waiting_time = current_time - current_process->process.arrival_time;
-            write_log(current_process, "started", current_time);
-        } 
-        else 
-        {
-            kill (current_process->pid, SIGCONT);
-            current_process->waiting_time = current_process->waiting_time + (current_time - current_process->Last_execution);
-            write_log(current_process, "resumed", current_time);
+
+            quantum_progress = 0;  // reset quantum counter for new process
+
+            if (!isCircularQueueEmpty(cq))
+            {
+                Process currentProcess = dequeueCircularQueue(cq);
+                // find PCB for this process 
+                for (int i = 0; i < total_processes; i++) 
+                {
+                    if (pcb[i].process.id == currentProcess.id) 
+                    {
+                        current_process = &pcb[i]; 
+                        break; 
+                    } 
+                }
+
+                // start or resume process
+                if (current_process->pid == -1)
+                {
+                    current_process->start_time = current_time;
+                    current_process->pid = fork();
+                    if (current_process->pid == 0)
+                    {
+                        char remaining_time_str[10]; 
+                        sprintf(remaining_time_str, "%d", current_process->remaining_time); 
+                        execl("./process.out", "./process.out", remaining_time_str, argv[1], argv[3], NULL); 
+                        exit(1);
+                    }
+                    current_process->waiting_time = current_time - current_process->process.arrival_time;
+                    write_log(current_process, "started", current_time);
+                } 
+                else 
+                {
+                    kill(current_process->pid, SIGCONT);
+                    current_process->waiting_time += (current_time - current_process->Last_execution);
+                    write_log(current_process, "resumed", current_time);
+                }
+
+                current_process->state = 1;
+                current_process->Last_execution = current_time;
+            }
         }
 
-
-        current_process->state = 1;
-        current_process->Last_execution = current_time;
-
-        int run_time = (current_process->remaining_time > quanta) ? quanta : current_process->remaining_time;
-
-        int start_time = getClk();
-        int end_time = start_time + run_time;
-
-        while (getClk() < end_time && current_process->remaining_time > 0);
-
-        current_time = getClk();
-
-        printf ("\n");
-
-        current_process->remaining_time -= run_time; 
-        current_process->executionTime += run_time; 
-        busy_time += run_time;
-
-        total_time = current_time;
-
-
-        if (current_process->remaining_time <= 0)
+        // run for exactly one second if we have a process
+        if (current_process)
         {
-            current_process->TA = current_time - current_process->process.arrival_time;
-            current_process->WTA = (float) current_process->TA / current_process->process.runtime;
-            current_process->state = 2;     //finished
+            int next_time = getClk() + 1;
+            while (getClk() < next_time && current_process->remaining_time > 0);
 
-            write_log (current_process, "finished", current_time);
-            freeMemory (memory_allocator, current_process->memory_block, current_process->process.id);
-            checkWaitingQueue();
+            current_process->remaining_time--; 
+            current_process->executionTime++; 
+            busy_time++;
+            quantum_progress++;
+            total_time = current_time;
 
-            int status;
-            waitpid (current_process->pid, &status, 0);
-            
-            completed_processes++;
-            current_process = NULL;
+            // check if process finished
+            if (current_process->remaining_time <= 0)
+            {
+                current_process->TA = current_time + 1 - current_process->process.arrival_time;
+                current_process->WTA = (float)current_process->TA / current_process->process.runtime;
+                current_process->state = 2;
 
-            kill(getppid(),SIGUSR1);
+                write_log(current_process, "finished", current_time + 1);
+                freeMemory(memory_allocator, current_process->memory_block, current_process->process.id);
+                checkWaitingQueue();
+
+                int status;
+                waitpid(current_process->pid, &status, 0);
+                
+                completed_processes++;
+                prev_process = current_process;
+                current_process = NULL;
+                quantum_progress = 0;
+
+                kill(getppid(), SIGUSR1);
+            }
         }
-        else 
-        {
-            kill (current_process->pid, SIGSTOP);
-            write_log(current_process, "stopped", current_time);
-
-            current_process->state = 0;  // Waiting
-            current_process->Last_execution = current_time;
-
-        }
-
     }
-    calculate_performance (process_count, pcb);
+    calculate_performance(process_count, pcb);
 }
 
 else if (algo == 4)
