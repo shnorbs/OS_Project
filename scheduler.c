@@ -29,13 +29,12 @@ struct msgbuff
 };
 
 
-
 typedef struct PCB PCB;
 typedef struct WaitingQueue WaitingQueue;
 
 // PHASE 2
 // ========================= MEMORY ========================
-typedef struct MemoryBlock 
+typedef struct MemoryBlock
 {
     int start_address;
     int size;
@@ -43,30 +42,30 @@ typedef struct MemoryBlock
     struct MemoryBlock* next;
 }
 MemoryBlock;
+MemoryBlock* allocated_block;
 
-
-typedef struct BuddyAllocator 
+typedef struct BuddyAllocator
 {
     MemoryBlock* memory_list;
     int total_size;
     FILE* memory_log;
-} 
+}
 BuddyAllocator;
 
 
 // Initialize buddy allocator
-BuddyAllocator* initBuddyAllocator(int total_size) 
+BuddyAllocator* initBuddyAllocator(int total_size)
 {
     BuddyAllocator* allocator = (BuddyAllocator*) malloc (sizeof(BuddyAllocator));
     allocator->total_size = total_size;
-    
+
     // Create initial free block
     allocator->memory_list = (MemoryBlock*) malloc (sizeof(MemoryBlock));
     allocator->memory_list->start_address = 0;
     allocator->memory_list->size = total_size;
     allocator->memory_list->is_free = true;
     allocator->memory_list->next = NULL;
-    
+
     // Open memory log file
     allocator->memory_log = fopen("memory.log", "w");
     return allocator;
@@ -74,7 +73,7 @@ BuddyAllocator* initBuddyAllocator(int total_size)
 
 
 // Find smallest power of 2 that fits the requested size
-int getNextPowerOf2(int size) 
+int getNextPowerOf2(int size)
 {
     int power = 1;
     while (power < size)
@@ -92,35 +91,35 @@ MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id)
 
     int required_size = getNextPowerOf2(size);
     MemoryBlock* current = allocator->memory_list;
-    
+
     while (current != NULL) {
-        if (current->is_free && current->size >= required_size) 
+        if (current->is_free && current->size >= required_size)
         {
             // Split blocks until we get the right size
             while (current->size > required_size) {
                 int new_size = current->size / 2;
                 MemoryBlock* buddy = (MemoryBlock*)malloc(sizeof(MemoryBlock));
-                
+
                 buddy->size = new_size;
                 buddy->start_address = current->start_address + new_size;
                 buddy->is_free = true;
                 buddy->next = current->next;
-                
+
                 current->size = new_size;
                 current->next = buddy;
             }
-            
+
             current->is_free = false;
             // Ensure logging happens and buffer is flushed
             fprintf(allocator->memory_log, "At time %d allocated %d bytes for process %d from %d to %d\n",
-                    getClk(), size, process_id, current->start_address, 
+                    getClk(), size, process_id, current->start_address,
                     current->start_address + current->size - 1);
             fflush(allocator->memory_log);
             return current;
         }
         current = current->next;
     }
-    
+
 
     // Log failed allocation attempt
     fprintf(allocator->memory_log, "At time %d failed to allocate %d bytes for process %d\n",
@@ -139,52 +138,52 @@ MemoryBlock* allocateMemory(BuddyAllocator* allocator, int size, int process_id)
             {
                 return false;
             }
-            
+
             return true;
         }
         else if (current->next == NULL)
         {
             return false;
         }
-        
+
         else
         {
             return isItFree(current->next, p);
         }
-        
+
     }
 
 
-bool areBuddies(MemoryBlock* block1, MemoryBlock* block2) 
+bool areBuddies(MemoryBlock* block1, MemoryBlock* block2)
 {
     if (!block1 || !block2) return false;
     if (block1->size != block2->size) return false;
-    
+
     // Check if blocks are properly aligned buddies
     return (block1->start_address ^ block2->start_address) == block1->size;
 }
 
 
 // Free memory
-void freeMemory(BuddyAllocator* allocator, MemoryBlock* block, int process_id) 
+void freeMemory(BuddyAllocator* allocator, MemoryBlock* block, int process_id)
 {
     if (!block) return;
-    
+
     block->is_free = true;
     fprintf(allocator->memory_log, "At time %d freed %d bytes from process %d from %d to %d\n",
-            getClk(), block->size, process_id, block->start_address, 
+            getClk(), block->size, process_id, block->start_address,
             block->start_address + block->size - 1);
-            
+
     // Keep merging buddies until no more merges are possible
     bool merged;
     do {
         merged = false;
         MemoryBlock* current = allocator->memory_list;
         MemoryBlock* prev = NULL;
-        
+
         while (current && current->next) {
             MemoryBlock* buddy = current->next;
-            
+
             if (current->is_free && buddy->is_free && areBuddies(current, buddy)) {
                 // Merge the buddies
                 current->size *= 2;
@@ -193,7 +192,7 @@ void freeMemory(BuddyAllocator* allocator, MemoryBlock* block, int process_id)
                 merged = true;
                 break;
             }
-            
+
             prev = current;
             current = current->next;
         }
@@ -206,7 +205,7 @@ void freeMemory(BuddyAllocator* allocator, MemoryBlock* block, int process_id)
 typedef struct Node
 {
     PCB * pcb;
-    struct Node * next; 
+    struct Node * next;
 } Node;
 
 
@@ -301,7 +300,7 @@ float* WTA;
 PriorityQueue* readyQueue;
 PCB* currentPCB = NULL;// Currently running process
 int Start_execution=0;
-FILE* log_file; 
+FILE* log_file;
 FILE* perf_file;
 
 
@@ -320,10 +319,10 @@ void initializeMemoryManagement() {
 void checkWaitingQueue() {
     while (memory_waiting_queue->size > 0) {
         PCB* waiting_pcb = dequeueWaiting(memory_waiting_queue);
-        MemoryBlock* allocated_block = allocateMemory(memory_allocator, 
+        MemoryBlock* allocated_block = allocateMemory(memory_allocator,
                                                     waiting_pcb->process.memsize,
                                                     waiting_pcb->process.id);
-        
+
         if (allocated_block != NULL) {
             waiting_pcb->memory_block = allocated_block;
             // Add back to appropriate scheduling queue based on algorithm
@@ -342,7 +341,7 @@ void checkWaitingQueue() {
 
 
 // MLFQ specific structures
-struct MLFQ 
+struct MLFQ
 {
     CircularQueue *queues[NO_OF_PRIORITIES]; // Array of queues for each priority level
     int current_level; // Current priority level being serviced
@@ -350,30 +349,30 @@ struct MLFQ
 };
 
 // Initialize MLFQ
-struct MLFQ* createMLFQ(int max_processes, int quantum) 
+struct MLFQ* createMLFQ(int max_processes, int quantum)
 {
     struct MLFQ *mlfq = (struct MLFQ*)malloc(sizeof(struct MLFQ));
     mlfq->time_quantum = quantum;
     mlfq->current_level = 0;
-    
+
     // Initialize queues for each priority level
-    for (int i = 0; i < NO_OF_PRIORITIES; i++) 
+    for (int i = 0; i < NO_OF_PRIORITIES; i++)
     {
         mlfq->queues[i] = createCircularQueue(max_processes);
     }
-    
+
     return mlfq;
 }
 
 // Add process to appropriate queue
-void addToMLFQ(struct MLFQ *mlfq, struct PCB *pcb) 
+void addToMLFQ(struct MLFQ *mlfq, struct PCB *pcb)
 {
     int priority = pcb->current_priority;
     enqueueCircularQueue(mlfq->queues[priority], pcb->process);
 }
 
 // Add a function to reset process priority to its original level
-void resetProcessPriority(struct PCB *process) 
+void resetProcessPriority(struct PCB *process)
 {
     process->current_priority = process->original_priority;
 }
@@ -393,29 +392,29 @@ void write_log (struct PCB *process, const char *state, int current_time)
 {
     if (process->state == 2)    // check if finished
     {
-        fprintf (log_file, "At time %d process %d %s arr %d total %d remain %d wait %d TA %d WTA %.2f%%\n", 
-                current_time, 
-                process->process.id, 
-                state, 
-                process->process.arrival_time, 
-                process->process.runtime, 
-                process->remaining_time, 
+        fprintf (log_file, "At time %d process %d %s arr %d total %d remain %d wait %d TA %d WTA %.2f%%\n",
+                current_time,
+                process->process.id,
+                state,
+                process->process.arrival_time,
+                process->process.runtime,
+                process->remaining_time,
                 process->waiting_time,
                 process->TA,
-                process->WTA); 
+                process->WTA);
     }
     else
     {
-        fprintf (log_file, "At time %d process %d %s arr %d total %d remain %d wait %d\n", 
-                current_time, 
-                process->process.id, 
-                state, 
-                process->process.arrival_time, 
-                process->process.runtime, 
-                process->remaining_time, 
-                process->waiting_time); 
-    }  
-    fflush (log_file);         
+        fprintf (log_file, "At time %d process %d %s arr %d total %d remain %d wait %d\n",
+                current_time,
+                process->process.id,
+                state,
+                process->process.arrival_time,
+                process->process.runtime,
+                process->remaining_time,
+                process->waiting_time);
+    }
+    fflush (log_file);
 }
 
 
@@ -444,7 +443,7 @@ void calculate_performance(int total_processes, struct PCB *pcb)
 
 
 int processCount = 0;
-int main(int argc, char* argv[]) 
+int main(int argc, char* argv[])
 {
     signal(SIGINT, clearResources);
     signal(SIGCHLD, handleProcessCompletion);  // Handle child process termination
@@ -460,7 +459,7 @@ int main(int argc, char* argv[])
 
     Process_Wait=(int*)malloc(sizeof(int)*process_count);
     WTA=(float*)malloc(sizeof(float)*process_count);
-   
+
     // Initialize runtime-based priority queue
     // Adjust as needed
     // readyQueue = createPriorityQueue(process_count);
@@ -476,21 +475,22 @@ int main(int argc, char* argv[])
         PCB* pcb [process_count];
         PCB* insertedPCB = NULL;
 
-        int total_processes = 0; 
+        int total_processes = 0;
         readyQueue = createPriorityQueue(process_count);
         struct msgbuff1
         {
             Process p;
             //int remainingTime;
-            
+
         }arrivingProcess;
 
-        while (true) 
+        while (true)
         {
             // Check for incoming processes
             int i = 0;
             current_time = getClk();
-            while (msgrcv(msgQid, &arrivingProcess, sizeof(arrivingProcess), 0, IPC_NOWAIT) != -1) 
+            PCB * Pcb_outside;
+            while (msgrcv(msgQid, &arrivingProcess, sizeof(arrivingProcess), 0, IPC_NOWAIT) != -1)
             {
                 PCB newPCB = {
                     .process = arrivingProcess.p,
@@ -505,17 +505,39 @@ int main(int argc, char* argv[])
                 insertRuntimePriorityQueue(readyQueue, pcb[i]->process);
                 insertedPCB = pcb[i];
                 processCount++;
-                i++;
+                 allocated_block = allocateMemory(memory_allocator,
+                                                pcb [i]->process.memsize,
+                                                pcb [i]->process.id);
+
+            if (allocated_block != NULL) {
+                // Memory allocated successfully
+                 pcb [i]->memory_block = allocated_block;
+               insertedPCB = pcb[i];
+                printf("Memory allocated for process %d\n", pcb [i]->process.id);
+            } else {
+                // If memory allocation fails, add to waiting queue
+                enqueueWaiting(memory_waiting_queue, pcb [i]);
+                printf("Process %d added to waiting queue - no memory available\n", pcb [i]->process.id);
+                insertedPCB = NULL;
+
+
             }
 
+                i++;
+
+            }
+
+
+
+
             // If no process is running, select the next process
-            if (currentPCB == NULL && readyQueue->size > 0) 
+            if (currentPCB == NULL && readyQueue->size > 0)
             {
                 Process nextProcess = removeRuntimePriorityQueue(readyQueue);
                 scheduleNextProcess(insertedPCB->process, pcb);
 
 
-                
+
             }
 
 
@@ -524,13 +546,13 @@ int main(int argc, char* argv[])
             {Waiting++;
                 printf("Waiting= %d \n",Waiting);
                 lasttime = getClk();
-            
+
             }
 
-            
+
         }
     }
-    else if (algo == 2) 
+    else if (algo == 2)
     {
     readyQueue = createPriorityQueue(process_count);
         bool recieved=false;
@@ -543,7 +565,7 @@ int main(int argc, char* argv[])
             Process p;
         } arrivingProcess;
 
-    while (true) 
+    while (true)
     { current_time=getClk();
         // Check for incoming processes
         PCB* insertedPCB = NULL;
@@ -558,32 +580,44 @@ int main(int argc, char* argv[])
                 .waiting_time = 0,
                 .pid = -1
             };
-            
-            insertedPCB = newPCB;
-            
-            printf("process%d recieved",arrivingProcess.p.id);
-            
-            
+
+            allocated_block = allocateMemory(memory_allocator,
+                                                newPCB->process.memsize,
+                                                newPCB->process.id);
+
+            if (allocated_block != NULL) {
+                // Memory allocated successfully
+                newPCB->memory_block = allocated_block;
+                insertedPCB = newPCB;
+                printf("Memory allocated for process %d\n", newPCB->process.id);
+            } else {
+                // If memory allocation fails, add to waiting queue
+                enqueueWaiting(memory_waiting_queue, newPCB);
+                printf("Process %d added to waiting queue - no memory available\n", newPCB->process.id);
+                insertedPCB = NULL;
+    }
+
+
         }
 
         if (currentPCB) {
             // Preemption logic
-            if (insertedPCB && currentPCB->process.priority > insertedPCB->process.priority && isItFree(memory_allocator->memory_list, insertedPCB->process)) 
+            if (insertedPCB && currentPCB->process.priority > insertedPCB->process.priority && isItFree(memory_allocator->memory_list, insertedPCB->process))
             {
                 printf("Preempting process %d (pid=%d)\n", currentPCB->process.id, currentPCB->pid);
                 kill(currentPCB->pid, SIGTSTP);  // Stop current process
                  int i = 0;
                 bool found = false;
-                while (i < process_count && !found) 
+                while (i < process_count && !found)
                 {
                     if (pcb[i] && pcb[i]->process.id == currentPCB->process.id)
                     {
                         int elapsed_time=getClk()-Start_execution;
                         pcb[i]->remaining_time-=elapsed_time;
                         Start_execution=0;
-                        pcb[i]->Last_execution=getClk(); 
+                        pcb[i]->Last_execution=getClk();
                     }
-                    
+
                     i++;
                 }
 
@@ -596,11 +630,11 @@ int main(int argc, char* argv[])
                 free(insertedPCB);
                 insertedPCB = NULL;
                 recieved=true;
-        
+
             }
             else
             {
-                 if (insertedPCB) 
+                 if (insertedPCB)
                 {
                     printf("I am inserted process %d\n",insertedPCB->process.id);
                     insertPriorityPriorityQueue(readyQueue, insertedPCB->process);
@@ -611,8 +645,8 @@ int main(int argc, char* argv[])
 
             }
 
-        } 
-        
+        }
+
         else {
             // If no current process, add new process to the queue
             if (insertedPCB) {
@@ -656,9 +690,9 @@ int main(int argc, char* argv[])
         {Waiting++;
             printf("Waiting= %d \n",Waiting);
             lasttime=getClk();
-        
+
         }
-        
+
     }
 }
 
@@ -680,28 +714,28 @@ else if (algo == 3)
     struct msgbuff arrivingProcess;
 
     while (completed_processes < process_count)
-    {   
+    {
         current_time = getClk();
-        
+
         // Receive processes sent if any
         // fixed this by using while loop instead of if; this is why process 1 gave wrong output
         while (msgrcv (msgQid, &arrivingProcess, sizeof(arrivingProcess), 0, IPC_NOWAIT) != -1)
-        { 
+        {
             printf ("Process %d received at time %d\n", arrivingProcess.p.id, getClk());
             struct PCB *new_pcb = &pcb[total_processes];
 
-            new_pcb->process = arrivingProcess.p; 
-            new_pcb->remaining_time = arrivingProcess.p.runtime; 
-            new_pcb->state = 0;     // Waiting  
-            new_pcb->waiting_time = 0; 
-            new_pcb->executionTime = 0; 
-            new_pcb->pid = -1; 
+            new_pcb->process = arrivingProcess.p;
+            new_pcb->remaining_time = arrivingProcess.p.runtime;
+            new_pcb->state = 0;     // Waiting
+            new_pcb->waiting_time = 0;
+            new_pcb->executionTime = 0;
+            new_pcb->pid = -1;
 
             pcb [total_processes] = *new_pcb;
             enqueueCircularQueue (cq, pcb [total_processes].process);
             total_processes++;
-        }   
-        
+        }
+
 
         if (current_process && current_process->state != 2)
         {
@@ -710,22 +744,22 @@ else if (algo == 3)
         }
 
         // loop again if queue is empty
-        if (isCircularQueueEmpty(cq)) 
-        { 
-            continue; 
+        if (isCircularQueueEmpty(cq))
+        {
+            continue;
         }
 
         // Select process to run
         Process currentProcess = dequeueCircularQueue (cq);
-        // Find PCB for this process 
-        //struct PCB *current_process = NULL; 
-        for (int i = 0; i < total_processes; i++) 
+        // Find PCB for this process
+        //struct PCB *current_process = NULL;
+        for (int i = 0; i < total_processes; i++)
         {
-            if (pcb[i].process.id == currentProcess.id) 
+            if (pcb[i].process.id == currentProcess.id)
             {
-                current_process = &pcb[i]; 
-                break; 
-            } 
+                current_process = &pcb[i];
+                break;
+            }
         }
 
 
@@ -736,20 +770,20 @@ else if (algo == 3)
             current_process->pid = fork();
             if (current_process->pid == 0)
             {
-                char remaining_time_str[10]; 
-                //char quantum_str[10]; 
+                char remaining_time_str[10];
+                //char quantum_str[10];
 
-                sprintf(remaining_time_str, "%d", current_process->remaining_time); 
-                //sprintf(quantum_str, "%d", quanta); 
+                sprintf(remaining_time_str, "%d", current_process->remaining_time);
+                //sprintf(quantum_str, "%d", quanta);
 
-                execl("./process.out", "./process.out", remaining_time_str, argv[1], argv[3], NULL); 
-                perror("execl failed"); 
+                execl("./process.out", "./process.out", remaining_time_str, argv[1], argv[3], NULL);
+                perror("execl failed");
                 exit(1);
             }
             current_process->waiting_time = current_time - current_process->process.arrival_time;
             write_log(current_process, "started", current_time);
-        } 
-        else 
+        }
+        else
         {
             kill (current_process->pid, SIGCONT);
             current_process->waiting_time = current_process->waiting_time + (current_time - current_process->Last_execution);
@@ -771,8 +805,8 @@ else if (algo == 3)
 
         printf ("\n");
 
-        current_process->remaining_time -= run_time; 
-        current_process->executionTime += run_time; 
+        current_process->remaining_time -= run_time;
+        current_process->executionTime += run_time;
         busy_time += run_time;
 
         total_time = current_time;
@@ -788,13 +822,13 @@ else if (algo == 3)
 
             int status;
             waitpid (current_process->pid, &status, 0);
-            
+
             completed_processes++;
             current_process = NULL;
 
             kill(getppid(),SIGUSR1);
         }
-        else 
+        else
         {
             kill (current_process->pid, SIGSTOP);
             write_log(current_process, "stopped", current_time);
@@ -812,7 +846,7 @@ else if (algo == 4)
 {
     log_file = fopen("scheduler.log", "w");
     perf_file = fopen("scheduler.perf", "w");
-    if (!log_file || !perf_file) 
+    if (!log_file || !perf_file)
     {
         perror("Error opening log/perf files");
         exit(1);
@@ -832,18 +866,18 @@ else if (algo == 4)
 
     int prev_run_id;
 
-    while (true) 
+    while (true)
     {
         current_time = getClk();
 
         // Receive new processes
         // int rec_value = msgrcv(msgQid, &arrivingProcess, sizeof(arrivingProcess), 0, IPC_NOWAIT);
-        // if (rec_value != -1) 
+        // if (rec_value != -1)
         while (msgrcv(msgQid, &arrivingProcess, sizeof(arrivingProcess), 0, IPC_NOWAIT) != -1)
         {
             printf("Process %d received at time %d\n", arrivingProcess.p.id, current_time);
             struct PCB *new_pcb = &pcb[total_processes];
-            
+
             new_pcb->process = arrivingProcess.p;
             new_pcb->remaining_time = arrivingProcess.p.runtime;
             new_pcb->state = 0;
@@ -852,7 +886,7 @@ else if (algo == 4)
             new_pcb->pid = -1;
             new_pcb->original_priority = arrivingProcess.p.priority;
             new_pcb->current_priority = arrivingProcess.p.priority;
-            
+
             // Add to appropriate queue level
             pcb [total_processes] = *new_pcb;
             addToMLFQ(mlfq, &pcb [total_processes]);
@@ -867,34 +901,34 @@ else if (algo == 4)
 
         // Find highest priority non-empty queue
         int current_level = 0;
-        while (current_level < NO_OF_PRIORITIES && isCircularQueueEmpty(mlfq->queues[current_level])) 
+        while (current_level < NO_OF_PRIORITIES && isCircularQueueEmpty(mlfq->queues[current_level]))
         {
             current_level++;
         }
-        
-        if (current_level < NO_OF_PRIORITIES) 
+
+        if (current_level < NO_OF_PRIORITIES)
         {
             Process currentProcess = dequeueCircularQueue(mlfq->queues[current_level]);
            // struct PCB *current_process = NULL;
-            
+
             // Find PCB for this process
-            for (int i = 0; i < total_processes; i++) 
+            for (int i = 0; i < total_processes; i++)
             {
-                if (pcb[i].process.id == currentProcess.id) 
+                if (pcb[i].process.id == currentProcess.id)
                 {
                     current_process = &pcb[i];
                     break;
                 }
             }
 
-            if (current_process) 
+            if (current_process)
             {
                 // Start or resume process
-                if (current_process->pid == -1) 
+                if (current_process->pid == -1)
                 {
                     current_process->start_time = current_time;
                     current_process->pid = fork();
-                    if (current_process->pid == 0) 
+                    if (current_process->pid == 0)
                     {
                         char remaining_time_str[10];
                         sprintf(remaining_time_str, "%d", current_process->remaining_time);
@@ -903,7 +937,7 @@ else if (algo == 4)
                     }
                     current_process->waiting_time = current_time - current_process->process.arrival_time;
                     write_log(current_process, "started", current_time);
-                } else 
+                } else
                 {
                     kill(current_process->pid, SIGCONT);
 
@@ -911,50 +945,50 @@ else if (algo == 4)
                         current_process->waiting_time += (current_time - current_process->Last_execution);
                     write_log(current_process, "resumed", current_time);
                 }
-                
+
                 current_process->state = 1;
                 current_process->Last_execution = current_time;
-                
+
                 // Run for quantum
                 int start_time = getClk();
                  int run_time = (current_process->remaining_time > quanta) ? quanta : current_process->remaining_time;
                 int end_time = start_time + run_time;
-                
-                while (getClk() < end_time && current_process->remaining_time > 0) 
+
+                while (getClk() < end_time && current_process->remaining_time > 0)
                 {
                     // Wait for quantum to complete
                 }
-                
+
                 current_time = getClk();
                 int execution_time = current_time - start_time;
                 current_process->remaining_time -= execution_time;
                 current_process->executionTime += execution_time;
                 busy_time += execution_time;
                 total_time = current_time;
-                
-                if (current_process->remaining_time <= 0) 
+
+                if (current_process->remaining_time <= 0)
                 {
                     // Process completed
                     current_process->TA = current_time - current_process->process.arrival_time;
                     current_process->WTA = (float)current_process->TA / current_process->process.runtime;
                     current_process->state = 2;
-                    
+
                     write_log(current_process, "finished", current_time);
                     int status;
                     waitpid(current_process->pid, &status, 0);
                     completed_processes++;
 
                     kill(getppid(),SIGUSR1);
-                } else 
+                } else
                 {
                     // Process not finished, move to lower priority
                     kill(current_process->pid, SIGSTOP);
 
                     // If at the lowest priority, reset to original priority
-                    if (current_process->current_priority >= NO_OF_PRIORITIES - 1) 
+                    if (current_process->current_priority >= NO_OF_PRIORITIES - 1)
                     {
                         resetProcessPriority(current_process);
-                    } else 
+                    } else
                     {
                         // Move to a lower priority queue
                         current_process->current_priority++;
@@ -967,19 +1001,19 @@ else if (algo == 4)
                 }
             }
         }
-        
+
     }
     calculate_performance(process_count, pcb);
 }
 
-    
-    // Finalize and cleanup 
+
+    // Finalize and cleanup
     if (algo < 3)
         logSchedulerPerformance(finished_counter); //Not working for some reason implementation below
     fclose(log_file);
     destroyPriorityQueue(readyQueue);
     //clearResources(0);
-    
+
     return 0;
 }
 
@@ -993,16 +1027,16 @@ void handleProcessCompletion(int signum) {
 
         // Free memory
         freeMemory(memory_allocator, currentPCB->memory_block, currentPCB->process.id);
-        
+
         // Check waiting queue for processes that can now be allocated
         checkWaitingQueue();
 
         finished_counter++;
         printf("finishedcounter=%d \n", finished_counter);
-        
-        currentPCB->waiting_time = currentPCB->finish_time - currentPCB->process.arrival_time - currentPCB->process.runtime;   
 
-        
+        currentPCB->waiting_time = currentPCB->finish_time - currentPCB->process.arrival_time - currentPCB->process.runtime;
+
+
         logProcessfinished(log_file, currentPCB, "finished", currentPCB->finish_time);
 
         if(currentPCB)
@@ -1039,20 +1073,20 @@ void clearResources(int signum) {
         free(current);
         current = next;
     }
-    
+
     // Close memory log file
     fclose(memory_allocator->memory_log);
-    
+
     // Free allocator
     free(memory_allocator);
-    
+
     // Free waiting queue
     while (memory_waiting_queue->size > 0) {
         PCB* pcb = dequeueWaiting(memory_waiting_queue);
         free(pcb);
     }
     free(memory_waiting_queue);
-    
+
     //destroyClk(true);
     destroyPriorityQueue(readyQueue);
     free(WTA);
@@ -1065,7 +1099,7 @@ void logSchedulerPerformance(int processCount) {
     float totalWTA = 0;
     float totalWait = 0;
 
-    for (int i = 0; i < processCount; i++) 
+    for (int i = 0; i < processCount; i++)
     { totalWTA+=WTA[i];
       totalWait+=Process_Wait[i];
     }
@@ -1086,26 +1120,26 @@ void logSchedulerPerformance(int processCount) {
     fprintf(perf_file, "Avg Waiting = %.2f\n", avgWait);
 
     fclose(perf_file) ;
-    
-    
+
+
 }
 
 bool scheduleNextProcess(Process nextProcess, PCB* pcb[]) {
     // Try to allocate memory first
-    MemoryBlock* allocated_block = allocateMemory(memory_allocator, 
-                                                nextProcess.memsize,
-                                                nextProcess.id);
-    
-    if (allocated_block == NULL) {
-        // If memory allocation fails, add to waiting queue
-        PCB* waiting_pcb = (PCB*)malloc(sizeof(PCB));
-        waiting_pcb->process = nextProcess;
-        waiting_pcb->state = Ready;
-        waiting_pcb->remaining_time = nextProcess.runtime;
-        waiting_pcb->waiting_time = 0;
-        enqueueWaiting(memory_waiting_queue, waiting_pcb);
-        return false;
-    }
+    // MemoryBlock* allocated_block = allocateMemory(memory_allocator,
+    //                                             nextProcess.memsize,
+    //                                             nextProcess.id);
+
+    // if (allocated_block == NULL) {
+    //     // If memory allocation fails, add to waiting queue
+    //     PCB* waiting_pcb = (PCB*)malloc(sizeof(PCB));
+    //     waiting_pcb->process = nextProcess;
+    //     waiting_pcb->state = Ready;
+    //     waiting_pcb->remaining_time = nextProcess.runtime;
+    //     waiting_pcb->waiting_time = 0;
+    //     enqueueWaiting(memory_waiting_queue, waiting_pcb);
+    //     return false;
+    // }
 
     // If memory allocation succeeds, proceed with process creation
     pid_t pid = fork();
@@ -1130,7 +1164,7 @@ bool scheduleNextProcess(Process nextProcess, PCB* pcb[]) {
         currentPCB->remaining_time = nextProcess.runtime;
         pcb[Processes_entered] = currentPCB;
         Processes_entered++;
-        
+
         logProcessEvent(log_file, currentPCB, "started", currentPCB->start_time);
         return true;
     } else {
